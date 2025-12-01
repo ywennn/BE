@@ -1,5 +1,8 @@
 const validate = require("../validation/validation");
-const { registerUserValidation } = require("../validation/userValidation");
+const {
+  registerUserValidation,
+  loginUserValidation,
+} = require("../validation/userValidation");
 const prisma = require("../db/prisma");
 const bcrypt = require("bcryptjs");
 const ResponseError = require("../errors/responseError");
@@ -33,8 +36,33 @@ const register = async (req) => {
   return newUser;
 };
 
-const login = async (req) => {};
+const login = async (req) => {
+  const validatedData = validate(loginUserValidation, req);
+
+  const findUser = await prisma.user.findUnique({
+    where: {
+      email: validatedData.email,
+    },
+    select: {
+      email: true,
+      name: true,
+      photoUrl: true,
+      createdAt: true,
+    },
+  });
+
+  if (!findUser) {
+    throw new ResponseError(400, "Email atau Password salah", false);
+  }
+  const passwordUser = findUser.password;
+
+  const decode = await bcrypt.compare(validatedData.password, passwordUser);
+  if (!decode) {
+    throw new ResponseError(400, "Email atau Password salah", false);
+  }
+};
 
 module.exports = {
   register,
+  login,
 };
