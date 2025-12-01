@@ -1,0 +1,281 @@
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+// ========================
+// DATASOURCE
+// ========================
+datasource db {
+  provider = "postgresql"
+  
+}
+
+
+// ========================
+// ENUM
+// ========================
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  PENGURUS
+  MEMBER
+}
+
+enum MemberStatus {
+  PENDAFTAR
+  AKTIF
+  NONAKTIF
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum PositionCategory {
+  BPH
+  DEPARTMENT
+}
+
+enum ResponseStatus {
+  SUBMITTED
+  VERIFIED
+  REJECTED
+}
+
+
+// ========================
+// USER & MEMBER
+// ========================
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(MEMBER)
+  photoUrl  String?  @map("photo_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt    @map("updated_at")
+  deletedAt DateTime?              @map("deleted_at")
+
+  member     Member?
+  blogs      Blog[]
+  events     Event[]  @relation("events_created")
+  galleries  Gallery[]
+}
+
+
+model Member {
+  id              String       @id @default(uuid())
+  userId          String       @unique
+  nimOrIdentifier String?      @map("nim_or_identifier")
+  division        String?
+  status          MemberStatus @default(PENDAFTAR)
+  joinedAt        DateTime?    @map("joined_at")
+  extra           Json?
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt      @map("updated_at")
+  deletedAt       DateTime?                    @map("deleted_at")
+
+  user             User              @relation(fields: [userId], references: [id])
+  structureMembers StructureMember[]
+}
+
+
+
+// ========================
+// ORGANIZATIONAL STRUCTURE
+// ========================
+
+model Period {
+  id        String   @id @default(uuid())
+  name      String
+  startDate DateTime? @map("start_date")
+  endDate   DateTime? @map("end_date")
+  isActive  Boolean   @default(false) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  structureMembers StructureMember[]
+}
+
+
+model Department {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  description String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  structureMembers StructureMember[]
+}
+
+
+model Position {
+  id        String   @id @default(uuid())
+  name      String
+  category  PositionCategory
+  rank      Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  structureMembers StructureMember[]
+}
+
+
+model StructureMember {
+  id           String   @id @default(uuid())
+  memberId     String
+  periodId     String
+  departmentId String?
+  positionId   String
+
+  photoUrl String? @map("photo_url")
+  order    Int?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  member     Member     @relation(fields: [memberId], references: [id])
+  period     Period     @relation(fields: [periodId], references: [id])
+  department Department?@relation(fields: [departmentId], references: [id])
+  position   Position   @relation(fields: [positionId], references: [id])
+}
+
+
+
+// ========================
+// BLOG CMS
+// ========================
+
+model Blog {
+  id              String        @id @default(uuid())
+  title           String
+  slug            String        @unique
+  content         String
+  excerpt         String?
+  thumbnailUrl    String?       @map("thumbnail_url")
+  status          ContentStatus @default(DRAFT)
+
+  metaTitle       String?
+  metaDescription String?
+
+  authorId        String
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt      @map("updated_at")
+  deletedAt       DateTime?                @map("deleted_at")
+
+  author User @relation(fields: [authorId], references: [id])
+
+  @@index([slug])
+  @@index([createdAt])
+}
+
+
+
+// ========================
+// GALLERY
+// ========================
+
+model Gallery {
+  id         String   @id @default(uuid())
+  album      String?
+  imageUrl   String   @map("image_url")
+  caption    String?
+  uploadedBy String?  @map("uploaded_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  deletedAt DateTime?
+
+  uploader User? @relation(fields: [uploadedBy], references: [id])
+
+  @@index([createdAt])
+}
+
+
+
+// ========================
+// EVENT CMS
+// ========================
+
+model Event {
+  id        String   @id @default(uuid())
+  title     String
+  slug      String   @unique
+  description String?
+  posterUrl String?  @map("poster_url")
+  eventDate DateTime? @map("event_date")
+  location  String?
+  quota     Int?
+  status    ContentStatus @default(DRAFT)
+
+  createdBy String   @map("created_by")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+  deletedAt DateTime?
+
+  creator User @relation("events_created", fields: [createdBy], references: [id])
+  form    EventForm?
+
+  @@index([slug])
+  @@index([eventDate])
+}
+
+
+
+// ========================
+// EVENT FORM
+// ========================
+
+model EventForm {
+  id      String   @id @default(uuid())
+  eventId String   @unique
+  isOpen  Boolean  @default(true) @map("is_open")
+
+  customFields Json? @map("custom_fields")
+  settings     Json?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt      @map("updated_at")
+
+  event     Event          @relation(fields: [eventId], references: [id])
+  responses EventResponse[]
+}
+
+
+
+// ========================
+// EVENT RESPONSES
+// ========================
+
+model EventResponse {
+  id         String         @id @default(uuid())
+  formId     String
+
+  name       String?
+  email      String?
+  phone      String?
+  data       Json?
+
+  ipAddress  String?        @map("ip_address")
+  status     ResponseStatus @default(SUBMITTED)
+  submittedAt DateTime      @default(now()) @map("submitted_at")
+
+  form EventForm @relation(fields: [formId], references: [id])
+
+  @@map("event_responses")
+  @@index([submittedAt])
+}
